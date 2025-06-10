@@ -1,6 +1,6 @@
 # @ktauchathuranga/tictactoe.js
 
-A professional Tic Tac Toe game library for Node.js and browsers, inspired by chess.js. This library provides a robust and flexible implementation of Tic Tac Toe, supporting customizable board sizes, win conditions, and features like move history, undo/redo, and algebraic notation.
+A Tic Tac Toe game library for Node.js and browsers, inspired by chess.js. This library provides a robust and flexible implementation of Tic Tac Toe, supporting customizable board sizes, win conditions, and features like move history, undo/redo, and algebraic notation.
 
 [![npm version](https://img.shields.io/npm/v/@ktauchathuranga/tictactoe.js.svg)](https://www.npmjs.com/package/@ktauchathuranga/tictactoe.js)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -132,7 +132,7 @@ console.log(game.winner()); // 'X'
 
 ## Browser Example
 
-See the [example HTML file](https://github.com/ktauchathuranga/tictactoe.js/blob/main/examples/index.html) for a fully interactive Tic Tac Toe game using this library.
+See the [example HTML file](https://github.com/ktauchathuranga/tictactoe.js/blob/main/index.html) for a fully interactive Tic Tac Toe game using this library.
 
 ```html
 <!DOCTYPE html>
