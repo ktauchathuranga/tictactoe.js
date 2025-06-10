@@ -1,0 +1,46 @@
+# Node.js and npm
+node_modules/
+npm-debug.log
+yarn-error.log
+yarn.lock
+package-lock.json
+
+# Build outputs
+dist/
+build/
+
+# Testing
+coverage/
+*.test.js.log
+
+# Development tools
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+*.log
+*.tmp
+*.temp
+
+# Editor backups
+*~
+*.bak
+
+# Documentation build outputs
+docs/_build/
+docs/build/
+
+# Examples (optional, include if you don't want to version example outputs)
+examples/node_modules/
+examples/package-lock.json
