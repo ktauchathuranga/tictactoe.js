@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TicTacToe.js - Interactive Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .game-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .status {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+
+        .current-player {
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            font-weight: bold;
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin: 20px auto;
+            max-width: 300px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 15px;
+        }
+
+        .cell {
+            aspect-ratio: 1;
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 10px;
+            font-size: 2em;
+            font-weight: bold;
+            color: #333;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .cell:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 1);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .cell:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        .cell.winning {
+            background: #4CAF50 !important;
+            color: white;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 12px 24px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+        }
+
+        button:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .history {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .history h3 {
+            margin-bottom: 10px;
+            color: #fff;
+        }
+
+        .move-item {
+            padding: 5px 10px;
+            margin: 5px 0;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            font-size: 0.9em;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #FFD700;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        .winner-announcement {
+            text-align: center;
+            padding: 20px;
+            margin: 10px 0;
+            background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
+            border-radius: 15px;
+            font-size: 1.3em;
+            font-weight: bold;
+            animation: celebration 2s ease-in-out;
+        }
+
+        @keyframes celebration {
+            0% { transform: scale(0.8); opacity: 0; }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 20px;
+            }
+            
+            .board {
+                max-width: 250px;
+            }
+            
+            .cell {
+                font-size: 1.5em;
+            }
+            
+            .game-info {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            button {
+                width: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 TicTacToe.js</h1>
+        
+        <div class="game-info">
+            <div class="status" id="status">Game Ready</div>
+            <div class="current-player" id="currentPlayer">Player: X</div>
+        </div>
+
+        <div id="winnerAnnouncement" class="winner-announcement" style="display: none;"></div>
+
+        <div class="board" id="board"></div>
+
+        <div class="controls">
+            <button onclick="restartGame()">🔄 New Game</button>
+            <button onclick="undo()" id="undoBtn">↶ Undo</button>
+            <button onclick="redo()" id="redoBtn">↷ Redo</button>
+            <button onclick="toggle()">📋 History</button>
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="movesCount">0</div>
+                <div class="stat-label">Moves</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="emptyCells">9</div>
+                <div class="stat-label">Empty Cells</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="gameStatus">Ongoing</div>
+                <div class="stat-label">Status</div>
+            </div>
+        </div>
+
+        <div class="history" id="history" style="display: none;">
+            <h3>Move History</h3>
+            <div id="historyList"></div>
+        </div>
+    </div>
+
+    <script src="TicTacToe.js"></script>
+    <script>
+        // Initialize game
+        const game = new TicTacToe();
+        let historyVisible = false;
+
+        /**
+         * Initializes the game board UI
+         */
+        function initializeBoard() {
+            const boardElement = document.getElementById('board');
+            boardElement.innerHTML = '';
+            
+            for (let row = 0; row < game.config.boardSize; row++) {
+                for (let col = 0; col < game.config.boardSize; col++) {
+                    const cell = document.createElement('button');
+                    cell.className = 'cell';
+                    cell.id = `cell-${row}-${col}`;
+                    cell.onclick = () => makeMove(row, col);
+                    boardElement.appendChild(cell);
+                }
+            }
+            updateUI();
+        }
+
+        /**
+         * Makes a move and updates the UI
+         * @param {number} row - Row index
+         * @param {number} col - Column index
+         */
+        function makeMove(row, col) {
+            const result = game.move(row, col);
+            if (result.success) {
+                updateUI();
+                if (game.isGameOver()) {
+                    winnerAnnouncement();
+                }
+            } else {
+                alert(result.error);
+            }
+        }
+
+        /**
+         * Updates the entire UI based on game state
+         */
+        function updateUI() {
+            const board = game.board();
+            const stats = game.stats();
+            const winningLine = game.getWinningLine();
+            
+            // Update board
+            for (let row = 0; row < game.config.boardSize; row++) {
+                for (let col = 0; col < game.config.boardSize; col++) {
+                    const cell = document.getElementById(`cell-${row}-${col}`);
+                    cell.textContent = board[row][col] || '';
+                    cell.disabled = board[row][col] !== null || game.isGameOver();
+                    
+                    // Highlight winning line
+                    if (winningLine && winningLine.some(pos => pos.row === row && pos.col === col)) {
+                        cell.classList.add('winning');
+                    } else {
+                        cell.classList.remove('winning');
+                    }
+                }
+            }
+            
+            // Update game info
+            document.getElementById('status').textContent = getStatusText();
+            document.getElementById('currentPlayer').textContent = `Player: ${game.turn()}`;
+            
+            // Update stats
+            document.getElementById('movesCount').textContent = stats.moveCount;
+            document.getElementById('emptyCells').textContent = stats.emptyCells;
+            document.getElementById('gameStatus').textContent = stats.gameStatus.charAt(0).toUpperCase() + stats.gameStatus.slice(1);
+            
+            // Update buttons
+            document.getElementById('undoBtn').disabled = game.history().length === 0;
+            document.getElementById('redoBtn').disabled = game._redoStack.length === 0;
+            
+            // Update history if visible
+            if (historyVisible) {
+                updateHistory();
+            }
+        }
+
+        /**
+         * Gets the status message
+         * @returns {string} Status text
+         */
+        function getStatusText() {
+            if (game.isDraw()) {
+                return "🤝 It's a Draw!";
+            } else if (game.winner()) {
+                return `🎉 ${game.winner()} Wins!`;
+            } else {
+                return `🎮 ${game.turn()}'s Turn`;
+            }
+        }
+
+        /**
+         * Shows the winner or draw announcement
+         */
+        function winnerAnnouncement() {
+            const announcement = document.getElementById('winnerAnnouncement');
+            if (game.winner()) {
+                announcement.textContent = `🎉 Congratulations! Player ${game.winner()} Wins! 🎉`;
+                announcement.style.background = 'linear-gradient(45deg, #FF6B6B, #4ECDC4)';
+            } else {
+                announcement.textContent = "🤝 It's a Draw! Well played both! 🤝";
+                announcement.style.background = 'linear-gradient(45deg, #FFA726, #42A5F5)';
+            }
+            announcement.style.display = 'block';
+            
+            // Hide after 5 seconds
+            setTimeout(() => {
+                announcement.style.display = 'none';
+            }, 5000);
+        }
+
+        /**
+         * Resets the game and UI
+         */
+        function restartGame() {
+            game.reset();
+            document.getElementById('winnerAnnouncement').style.display = 'none';
+            updateUI();
+        }
+
+        /**
+         * Undoes the last move
+         */
+        function undo() {
+            const result = game.undo();
+            if (result.success) {
+                updateUI();
+                document.getElementById('winnerAnnouncement').style.display = 'none';
+            } else {
+                alert(result.error);
+            }
+        }
+
+        /**
+         * Redoes the last undone move
+         */
+        function redo() {
+            const result = game.redo();
+            if (result.success) {
+                updateUI();
+                if (game.isGameOver()) {
+                    winnerAnnouncement();
+                }
+            } else {
+                alert(result.error);
+            }
+        }
+
+        /**
+         * Toggles the visibility of move history
+         */
+        function toggle() {
+            historyVisible = !historyVisible;
+            const historyElement = document.getElementById('history');
+            historyElement.style.display = historyVisible ? 'block' : 'none';
+            if (historyVisible) {
+                updateHistory();
+            }
+        }
+
+        /**
+         * Updates the move history UI
+         */
+        function updateHistory() {
+            const historyList = document.getElementById('historyList');
+            const history = game.history();
+            
+            if (history.length === 0) {
+                historyList.innerHTML = '<div class="move-item">No moves yet</div>';
+                return;
+            }
+            
+            historyList.innerHTML = history.map((move, index) => 
+                `<div class="move-item">
+                    ${index + 1}. ${move.player} → ${move.algebraic}
+                </div>`
+            ).join('');
+        }
+
+        // Initialize the game
+        initializeBoard();
+    </script>
+</body>
+</html>
