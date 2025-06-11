@@ -3,7 +3,8 @@ name: Auto Publish to NPM
 on:
   push:
     branches: [ main ]
-
+permissions:
+  contents: write
 jobs:
   check-and-publish:
     runs-on: ubuntu-latest
@@ -46,10 +47,10 @@ jobs:
       if: steps.version-check.outputs.exists == 'false'
       run: npm test
     
-    - name: Build package
-      if: steps.version-check.outputs.exists == 'false'
-      run: npm run build
-      continue-on-error: true  # Continue if build script doesn't exist
+#    - name: Build package
+#      if: steps.version-check.outputs.exists == 'false'
+#      run: npm run build
+#      continue-on-error: true  # Continue if build script doesn't exist
     
     - name: Publish to NPM
       if: steps.version-check.outputs.exists == 'false'
