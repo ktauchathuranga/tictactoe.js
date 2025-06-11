@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@ktauchathuranga/tictactoe.js": "^1.0.3"
+  }
+}

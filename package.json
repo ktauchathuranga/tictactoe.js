@@ -1,6 +1,6 @@
 {
   "name": "@ktauchathuranga/tictactoe.js",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "description": "A Tic Tac Toe game library for Node.js and browsers.",
   "keywords": [
     "tictactoe"

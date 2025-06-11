@@ -1,10 +1,79 @@
 /**
- * TicTacToe.js - A professional Tic Tac Toe game library
- * @version 1.0.0
- * @author [Your Name]
+ * TicTacToe.js - A professional Tic Tac Toe game library (ESM)
+ * @version 1.0.2
+ * @author Ashen Chathurnaga
  * @license MIT
  */
-class TicTacToe {
+
+/**
+ * Custom error classes for better error handling
+ */
+export class TicTacToeError extends Error {
+    constructor(message, code = 'GENERIC_ERROR') {
+        super(message);
+        this.name = 'TicTacToeError';
+        this.code = code;
+    }
+}
+
+export class ConfigurationError extends TicTacToeError {
+    constructor(message) {
+        super(message, 'CONFIGURATION_ERROR');
+        this.name = 'ConfigurationError';
+    }
+}
+
+export class InvalidMoveError extends TicTacToeError {
+    constructor(message) {
+        super(message, 'INVALID_MOVE_ERROR');
+        this.name = 'InvalidMoveError';
+    }
+}
+
+export class GameStateError extends TicTacToeError {
+    constructor(message) {
+        super(message, 'GAME_STATE_ERROR');
+        this.name = 'GameStateError';
+    }
+}
+
+/**
+ * Professional Tic Tac Toe game implementation
+ */
+export default class TicTacToe {
+    // Private field declarations
+    #board;
+    #currentPlayer;
+    #moveHistory;
+    #gameStatus;
+    #winner;
+    #winningLine;
+    #moveCount;
+    #undoStack;
+    #redoStack;
+    #config;
+
+    // Constants
+    static GAME_STATUSES = Object.freeze({
+        ONGOING: 'ongoing',
+        FINISHED: 'finished',
+        DRAW: 'draw'
+    });
+
+    static DEFAULT_CONFIG = Object.freeze({
+        boardSize: 3,
+        winLength: 3,
+        players: ['X', 'O'],
+        startingPlayer: 'X'
+    });
+
+    static DIRECTIONS = Object.freeze([
+        [0, 1],   // horizontal
+        [1, 0],   // vertical
+        [1, 1],   // diagonal down-right
+        [1, -1]   // diagonal down-left
+    ]);
+
     /**
      * Creates a new TicTacToe game instance
      * @param {Object} [config={}] - Configuration options
@@ -12,34 +81,33 @@ class TicTacToe {
      * @param {number} [config.winLength=3] - Number of marks needed to win
      * @param {string[]} [config.players=['X', 'O']] - Player symbols
      * @param {string} [config.startingPlayer='X'] - Starting player symbol
+     * @throws {ConfigurationError} When configuration is invalid
      */
     constructor(config = {}) {
-        this.config = {
-            boardSize: config.boardSize || 3,
-            winLength: config.winLength || 3,
-            players: config.players || ['X', 'O'],
-            startingPlayer: config.startingPlayer || 'X',
+        this.#config = Object.freeze({
+            ...TicTacToe.DEFAULT_CONFIG,
             ...config
-        };
-        this._validateConfig();
+        });
+        
+        this.#validateConfig();
         this.reset();
     }
 
     /**
      * Resets the game to initial state
-     * @returns {TicTacToe} This instance
+     * @returns {TicTacToe} This instance for method chaining
      */
     reset() {
-        const size = this.config.boardSize;
-        this._board = Array(size).fill(null).map(() => Array(size).fill(null));
-        this._currentPlayer = this.config.startingPlayer;
-        this._moveHistory = [];
-        this._gameStatus = 'ongoing';
-        this._winner = null;
-        this._winningLine = null;
-        this._moveCount = 0;
-        this._undoStack = [];
-        this._redoStack = [];
+        const size = this.#config.boardSize;
+        this.#board = Array.from({ length: size }, () => Array(size).fill(null));
+        this.#currentPlayer = this.#config.startingPlayer;
+        this.#moveHistory = [];
+        this.#gameStatus = TicTacToe.GAME_STATUSES.ONGOING;
+        this.#winner = null;
+        this.#winningLine = null;
+        this.#moveCount = 0;
+        this.#undoStack = [];
+        this.#redoStack = [];
         return this;
     }
 
@@ -51,14 +119,18 @@ class TicTacToe {
      */
     move(row, col) {
         try {
-            const move = this._parseMove(row, col);
-            this._validateMove(move);
-            return this._executeMove(move);
+            const move = this.#parseMove(row, col);
+            this.#validateMove(move);
+            return this.#executeMove(move);
         } catch (error) {
             return {
                 success: false,
                 error: error.message,
-                move: null
+                errorType: error.constructor.name,
+                move: null,
+                gameStatus: this.#gameStatus,
+                winner: this.#winner,
+                winningLine: this.#winningLine ? [...this.#winningLine] : null
             };
         }
     }
@@ -67,327 +139,528 @@ class TicTacToe {
      * Gets all legal moves
      * @returns {Object[]} Array of possible moves {row, col, algebraic, player}
      */
-    moves() {
-        if (this._gameStatus !== 'ongoing') return [];
+    getLegalMoves() {
+        if (this.#gameStatus !== TicTacToe.GAME_STATUSES.ONGOING) {
+            return [];
+        }
+
         const legalMoves = [];
-        const size = this.config.boardSize;
+        const size = this.#config.boardSize;
+        
         for (let row = 0; row < size; row++) {
             for (let col = 0; col < size; col++) {
-                if (this._board[row][col] === null) {
+                if (this.#board[row][col] === null) {
                     legalMoves.push({
-                        row, col,
-                        algebraic: this._toAlgebraic(row, col),
-                        player: this._currentPlayer
+                        row,
+                        col,
+                        algebraic: this.#toAlgebraic(row, col),
+                        player: this.#currentPlayer
                     });
                 }
             }
         }
+        
         return legalMoves;
     }
 
     /**
      * Undoes the last move
      * @returns {Object} Result {success, error, move, gameStatus}
+     * @throws {GameStateError} When no moves to undo
      */
     undo() {
-        if (this._moveHistory.length === 0) {
-            return { success: false, error: 'No moves to undo' };
+        try {
+            if (this.#moveHistory.length === 0) {
+                throw new GameStateError('No moves to undo');
+            }
+
+            const lastMove = this.#moveHistory.pop();
+            this.#board[lastMove.row][lastMove.col] = null;
+            this.#currentPlayer = lastMove.player;
+            this.#moveCount--;
+            this.#updateGameStatus();
+            this.#redoStack.push(lastMove);
+
+            return {
+                success: true,
+                move: { ...lastMove },
+                gameStatus: this.#gameStatus,
+                currentPlayer: this.#currentPlayer
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: error.message,
+                errorType: error.constructor.name
+            };
         }
-        const lastMove = this._moveHistory.pop();
-        this._board[lastMove.row][lastMove.col] = null;
-        this._currentPlayer = lastMove.player;
-        this._moveCount--;
-        this._updateGameStatus();
-        this._redoStack.push(lastMove);
-        return { success: true, move: lastMove, gameStatus: this._gameStatus };
     }
 
     /**
      * Redoes the last undone move
      * @returns {Object} Result {success, error, move, gameStatus, winner, winningLine}
+     * @throws {GameStateError} When no moves to redo
      */
     redo() {
-        if (this._redoStack.length === 0) {
-            return { success: false, error: 'No moves to redo' };
+        try {
+            if (this.#redoStack.length === 0) {
+                throw new GameStateError('No moves to redo');
+            }
+
+            const moveToRedo = this.#redoStack.pop();
+            return this.move(moveToRedo.row, moveToRedo.col);
+        } catch (error) {
+            return {
+                success: false,
+                error: error.message,
+                errorType: error.constructor.name
+            };
         }
-        const moveToRedo = this._redoStack.pop();
-        return this.move(moveToRedo.row, moveToRedo.col);
     }
 
     /**
      * Gets current game status
-     * @returns {string} 'ongoing', 'checkmate', or 'draw'
+     * @returns {string} One of TicTacToe.GAME_STATUSES
      */
-    gameStatus() { return this._gameStatus; }
+    get gameStatus() {
+        return this.#gameStatus;
+    }
 
     /**
      * Checks if the game is over
      * @returns {boolean}
      */
-    isGameOver() { return this._gameStatus !== 'ongoing'; }
+    get isGameOver() {
+        return this.#gameStatus !== TicTacToe.GAME_STATUSES.ONGOING;
+    }
 
     /**
      * Gets the winner, if any
      * @returns {string|null}
      */
-    winner() { return this._winner; }
+    get winner() {
+        return this.#winner;
+    }
 
     /**
      * Checks if the game is a draw
      * @returns {boolean}
      */
-    isDraw() { return this._gameStatus === 'draw'; }
+    get isDraw() {
+        return this.#gameStatus === TicTacToe.GAME_STATUSES.DRAW;
+    }
 
     /**
      * Gets the current player's symbol
      * @returns {string}
      */
-    turn() { return this._currentPlayer; }
+    get currentPlayer() {
+        return this.#currentPlayer;
+    }
 
     /**
-     * Gets move history
+     * Gets move history (immutable copy)
      * @returns {Object[]} Array of moves
      */
-    history() { return [...this._moveHistory]; }
+    get history() {
+        return this.#moveHistory.map(move => ({ ...move }));
+    }
 
     /**
-     * Gets the current board state
-     * @param {string} [format='array'] - Format: 'array' (default)
+     * Gets the current board state (immutable copy)
      * @returns {Array[][]} Board state
      */
-    board() {
-        return this._board.map(row => row.slice());
+    get board() {
+        return this.#board.map(row => [...row]);
     }
 
     /**
-     * Gets game statistics
-     * @returns {Object} Stats {moveCount, emptyCells, playerCounts, gameStatus, ...}
+     * Gets game configuration (immutable copy)
+     * @returns {Object} Configuration object
      */
-    stats() {
-        const emptyCells = this._countEmptyCells();
-        const playerCounts = this._getPlayerCounts();
-        return {
-            moveCount: this._moveCount,
-            emptyCells,
-            playerCounts,
-            gameStatus: this._gameStatus,
-            winner: this._winner,
-            currentPlayer: this._currentPlayer,
-            boardSize: this.config.boardSize,
-            winLength: this.config.winLength
-        };
+    get config() {
+        return { ...this.#config };
     }
 
     /**
-     * Gets the winning line, if any
+     * Gets comprehensive game statistics
+     * @returns {Object} Stats object with all game metrics
+     */
+    get stats() {
+        const emptyCells = this.#countEmptyCells();
+        const playerCounts = this.#getPlayerCounts();
+        
+        return Object.freeze({
+            moveCount: this.#moveCount,
+            emptyCells,
+            playerCounts: Object.freeze(playerCounts),
+            gameStatus: this.#gameStatus,
+            winner: this.#winner,
+            currentPlayer: this.#currentPlayer,
+            boardSize: this.#config.boardSize,
+            winLength: this.#config.winLength,
+            canUndo: this.#moveHistory.length > 0,
+            canRedo: this.#redoStack.length > 0,
+            legalMovesCount: this.getLegalMoves().length
+        });
+    }
+
+    /**
+     * Gets the winning line, if any (immutable copy)
      * @returns {Object[]|null} Array of {row, col} positions
      */
-    getWinningLine() { return this._winningLine ? this._winningLine.slice() : null; }
+    get winningLine() {
+        return this.#winningLine ? this.#winningLine.map(pos => ({ ...pos })) : null;
+    }
 
     /**
-     * Exports the game state
-     * @returns {Object} Game state object
+     * Exports the complete game state
+     * @returns {Object} Serializable game state object
      */
     exportState() {
-        return {
-            board: this.board(),
-            currentPlayer: this._currentPlayer,
-            moveHistory: this.history(),
-            gameStatus: this._gameStatus,
-            winner: this._winner,
-            winningLine: this.getWinningLine(),
-            moveCount: this._moveCount,
-            config: { ...this.config }
-        };
+        return Object.freeze({
+            board: this.board,
+            currentPlayer: this.#currentPlayer,
+            moveHistory: this.history,
+            gameStatus: this.#gameStatus,
+            winner: this.#winner,
+            winningLine: this.winningLine,
+            moveCount: this.#moveCount,
+            config: this.config,
+            timestamp: Date.now(),
+            version: '1.0.0'
+        });
     }
 
     /**
      * Imports a game state
-     * @param {Object} state - Game state object
-     * @returns {TicTacToe} This instance
+     * @param {Object} state - Game state object from exportState()
+     * @returns {TicTacToe} This instance for method chaining
+     * @throws {ConfigurationError} When state is invalid
      */
     importState(state) {
-        this.config = { ...this.config, ...state.config };
-        this._validateConfig();
-        this._board = state.board.map(row => row.slice());
-        this._currentPlayer = state.currentPlayer;
-        this._moveHistory = state.moveHistory.slice();
-        this._gameStatus = state.gameStatus;
-        this._winner = state.winner;
-        this._winningLine = state.winningLine ? state.winningLine.slice() : null;
-        this._moveCount = state.moveCount;
-        this._undoStack = [];
-        this._redoStack = [];
-        return this;
+        try {
+            if (!state || typeof state !== 'object') {
+                throw new ConfigurationError('Invalid state object');
+            }
+
+            // Validate required properties
+            const requiredProps = ['board', 'currentPlayer', 'moveHistory', 'gameStatus', 'config'];
+            for (const prop of requiredProps) {
+                if (!(prop in state)) {
+                    throw new ConfigurationError(`Missing required property: ${prop}`);
+                }
+            }
+
+            // Update configuration and validate
+            this.#config = Object.freeze({ ...this.#config, ...state.config });
+            this.#validateConfig();
+
+            // Import state
+            this.#board = state.board.map(row => [...row]);
+            this.#currentPlayer = state.currentPlayer;
+            this.#moveHistory = state.moveHistory.map(move => ({ ...move }));
+            this.#gameStatus = state.gameStatus;
+            this.#winner = state.winner || null;
+            this.#winningLine = state.winningLine ? state.winningLine.map(pos => ({ ...pos })) : null;
+            this.#moveCount = state.moveCount || 0;
+            this.#undoStack = [];
+            this.#redoStack = [];
+
+            // Validate imported state
+            this.#validateImportedState();
+
+            return this;
+        } catch (error) {
+            throw new ConfigurationError(`Failed to import state: ${error.message}`);
+        }
+    }
+
+    /**
+     * Validates if a move is legal without executing it
+     * @param {number|string|Object} row - Row specification
+     * @param {number} [col] - Column specification
+     * @returns {boolean} True if move is legal
+     */
+    isLegalMove(row, col) {
+        try {
+            const move = this.#parseMove(row, col);
+            this.#validateMove(move);
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Gets a string representation of the board
+     * @returns {string} Formatted board string
+     */
+    toString() {
+        const size = this.#config.boardSize;
+        const lines = [];
+        
+        // Header with column letters
+        const header = '   ' + Array.from({ length: size }, (_, i) => String.fromCharCode(97 + i)).join(' ');
+        lines.push(header);
+        
+        // Board rows
+        for (let row = 0; row < size; row++) {
+            const rowNum = (row + 1).toString().padStart(2);
+            const cells = this.#board[row].map(cell => cell || '.').join(' ');
+            lines.push(`${rowNum} ${cells}`);
+        }
+        
+        return lines.join('\n');
     }
 
     // Private methods
-    _validateConfig() {
-        const { boardSize, winLength, players } = this.config;
+    #validateConfig() {
+        const { boardSize, winLength, players, startingPlayer } = this.#config;
+
         if (!Number.isInteger(boardSize) || boardSize < 3 || boardSize > 10) {
-            throw new Error('Board size must be an integer between 3 and 10');
+            throw new ConfigurationError('Board size must be an integer between 3 and 10');
         }
+
         if (!Number.isInteger(winLength) || winLength < 3 || winLength > boardSize) {
-            throw new Error('Win length must be an integer between 3 and board size');
+            throw new ConfigurationError(`Win length must be an integer between 3 and ${boardSize}`);
         }
+
         if (!Array.isArray(players) || players.length < 2) {
-            throw new Error('Must have at least 2 players');
+            throw new ConfigurationError('Must have at least 2 players');
         }
-        if (!players.includes(this.config.startingPlayer)) {
-            throw new Error('Starting player must be one of the configured players');
+
+        if (new Set(players).size !== players.length) {
+            throw new ConfigurationError('Player symbols must be unique');
+        }
+
+        if (!players.every(p => typeof p === 'string' && p.length > 0)) {
+            throw new ConfigurationError('Player symbols must be non-empty strings');
+        }
+
+        if (!players.includes(startingPlayer)) {
+            throw new ConfigurationError('Starting player must be one of the configured players');
         }
     }
 
-    _parseMove(row, col) {
-        if (typeof row === 'object' && row !== null) {
+    #parseMove(row, col) {
+        if (row && typeof row === 'object' && 'row' in row && 'col' in row) {
             return { row: row.row, col: row.col };
         }
+
         if (typeof row === 'string') {
-            return this._fromAlgebraic(row);
+            return this.#fromAlgebraic(row);
         }
-        if (typeof row === 'number' && typeof col === 'number') {
+
+        if (Number.isInteger(row) && Number.isInteger(col)) {
             return { row, col };
         }
-        throw new Error('Invalid move format');
+
+        throw new InvalidMoveError('Invalid move format. Use (row, col), "algebraic", or {row, col}');
     }
 
-    _validateMove(move) {
+    #validateMove(move) {
         const { row, col } = move;
-        const size = this.config.boardSize;
+        const size = this.#config.boardSize;
+
         if (!Number.isInteger(row) || !Number.isInteger(col)) {
-            throw new Error('Row and column must be integers');
+            throw new InvalidMoveError('Row and column must be integers');
         }
+
         if (row < 0 || row >= size || col < 0 || col >= size) {
-            throw new Error(`Move out of bounds. Board size is ${size}x${size}`);
+            throw new InvalidMoveError(`Move out of bounds. Board size is ${size}×${size}`);
         }
-        if (this._board[row][col] !== null) {
-            throw new Error('Square is already occupied');
+
+        if (this.#board[row][col] !== null) {
+            throw new InvalidMoveError(`Square ${this.#toAlgebraic(row, col)} is already occupied by ${this.#board[row][col]}`);
         }
-        if (this._gameStatus !== 'ongoing') {
-            throw new Error(`Game is over. Status: ${this._gameStatus}`);
+
+        if (this.#gameStatus !== TicTacToe.GAME_STATUSES.ONGOING) {
+            throw new GameStateError(`Game is ${this.#gameStatus}. Cannot make moves.`);
         }
     }
 
-    _executeMove(move) {
+    #executeMove(move) {
         const { row, col } = move;
-        this._redoStack = [];
-        this._board[row][col] = this._currentPlayer;
-        const moveRecord = {
-            row, col,
-            player: this._currentPlayer,
-            algebraic: this._toAlgebraic(row, col),
-            moveNumber: this._moveCount + 1,
+        
+        // Clear redo stack on new move
+        this.#redoStack.length = 0;
+        
+        // Execute move
+        this.#board[row][col] = this.#currentPlayer;
+        
+        const moveRecord = Object.freeze({
+            row,
+            col,
+            player: this.#currentPlayer,
+            algebraic: this.#toAlgebraic(row, col),
+            moveNumber: this.#moveCount + 1,
             timestamp: Date.now()
-        };
-        this._moveHistory.push(moveRecord);
-        this._moveCount++;
-        this._updateGameStatus();
-        if (this._gameStatus === 'ongoing') {
-            this._switchPlayer();
+        });
+        
+        this.#moveHistory.push(moveRecord);
+        this.#moveCount++;
+        
+        // Update game status
+        this.#updateGameStatus();
+        
+        // Switch player if game continues
+        if (this.#gameStatus === TicTacToe.GAME_STATUSES.ONGOING) {
+            this.#switchPlayer();
         }
+        
         return {
             success: true,
-            move: moveRecord,
-            gameStatus: this._gameStatus,
-            winner: this._winner,
-            winningLine: this._winningLine
+            move: { ...moveRecord },
+            gameStatus: this.#gameStatus,
+            winner: this.#winner,
+            winningLine: this.winningLine,
+            isGameOver: this.isGameOver
         };
     }
 
-    _updateGameStatus() {
-        const winResult = this._checkWin();
+    #updateGameStatus() {
+        const winResult = this.#checkWin();
+        
         if (winResult.hasWin) {
-            this._gameStatus = 'checkmate';
-            this._winner = winResult.winner;
-            this._winningLine = winResult.line;
+            this.#gameStatus = TicTacToe.GAME_STATUSES.FINISHED;
+            this.#winner = winResult.winner;
+            this.#winningLine = winResult.line;
             return;
         }
-        if (this._countEmptyCells() === 0) {
-            this._gameStatus = 'draw';
-            this._winner = null;
-            this._winningLine = null;
+        
+        if (this.#countEmptyCells() === 0) {
+            this.#gameStatus = TicTacToe.GAME_STATUSES.DRAW;
+            this.#winner = null;
+            this.#winningLine = null;
             return;
         }
-        this._gameStatus = 'ongoing';
-        this._winner = null;
-        this._winningLine = null;
+        
+        this.#gameStatus = TicTacToe.GAME_STATUSES.ONGOING;
+        this.#winner = null;
+        this.#winningLine = null;
     }
 
-    _checkWin() {
-        const size = this.config.boardSize;
-        const winLength = this.config.winLength;
-        const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
+    #checkWin() {
+        const size = this.#config.boardSize;
+        const winLength = this.#config.winLength;
 
         for (let row = 0; row < size; row++) {
             for (let col = 0; col < size; col++) {
-                const player = this._board[row][col];
+                const player = this.#board[row][col];
                 if (!player) continue;
 
-                for (const [dRow, dCol] of directions) {
-                    const line = this._getLine(row, col, dRow, dCol, winLength);
-                    if (line.length === winLength && line.every(pos => this._board[pos.row][pos.col] === player)) {
+                for (const [dRow, dCol] of TicTacToe.DIRECTIONS) {
+                    const line = this.#getLine(row, col, dRow, dCol, winLength);
+                    if (line.length === winLength && 
+                        line.every(pos => this.#board[pos.row][pos.col] === player)) {
                         return { hasWin: true, winner: player, line };
                     }
                 }
             }
         }
+        
         return { hasWin: false };
     }
 
-    _getLine(startRow, startCol, dRow, dCol, length) {
+    #getLine(startRow, startCol, dRow, dCol, length) {
         const line = [];
-        const size = this.config.boardSize;
+        const size = this.#config.boardSize;
+        
         for (let i = 0; i < length; i++) {
             const row = startRow + i * dRow;
             const col = startCol + i * dCol;
-            if (row < 0 || row >= size || col < 0 || col >= size) break;
+            
+            if (row < 0 || row >= size || col < 0 || col >= size) {
+                break;
+            }
+            
             line.push({ row, col });
         }
+        
         return line;
     }
 
-    _switchPlayer() {
-        const currentIndex = this.config.players.indexOf(this._currentPlayer);
-        const nextIndex = (currentIndex + 1) % this.config.players.length;
-        this._currentPlayer = this.config.players[nextIndex];
+    #switchPlayer() {
+        const currentIndex = this.#config.players.indexOf(this.#currentPlayer);
+        const nextIndex = (currentIndex + 1) % this.#config.players.length;
+        this.#currentPlayer = this.#config.players[nextIndex];
     }
 
-    _toAlgebraic(row, col) {
+    #toAlgebraic(row, col) {
         const colLetter = String.fromCharCode(97 + col);
         const rowNumber = row + 1;
         return `${colLetter}${rowNumber}`;
     }
 
-    _fromAlgebraic(algebraic) {
+    #fromAlgebraic(algebraic) {
         if (typeof algebraic !== 'string' || algebraic.length < 2) {
-            throw new Error('Invalid algebraic notation');
+            throw new InvalidMoveError('Invalid algebraic notation format');
         }
-        const col = algebraic.charCodeAt(0) - 97;
-        const row = parseInt(algebraic.slice(1)) - 1;
+
+        const colChar = algebraic.charAt(0).toLowerCase();
+        const rowStr = algebraic.slice(1);
+
+        if (colChar < 'a' || colChar > 'z') {
+            throw new InvalidMoveError('Column must be a letter (a-z)');
+        }
+
+        const col = colChar.charCodeAt(0) - 97;
+        const row = parseInt(rowStr, 10) - 1;
+
+        if (!Number.isInteger(row) || row < 0) {
+            throw new InvalidMoveError('Row must be a positive integer');
+        }
+
+        const size = this.#config.boardSize;
+        if (col >= size || row >= size) {
+            throw new InvalidMoveError(`Position ${algebraic} is outside ${size}×${size} board`);
+        }
+
         return { row, col };
     }
 
-    _countEmptyCells() {
-        return this._board.flat().filter(cell => cell === null).length;
+    #countEmptyCells() {
+        return this.#board.flat().filter(cell => cell === null).length;
     }
 
-    _getPlayerCounts() {
+    #getPlayerCounts() {
         const counts = {};
-        this.config.players.forEach(player => counts[player] = 0);
-        this._board.flat().forEach(cell => {
-            if (cell !== null) {
-                counts[cell] = (counts[cell] || 0) + 1;
+        this.#config.players.forEach(player => {
+            counts[player] = 0;
+        });
+
+        this.#board.flat().forEach(cell => {
+            if (cell !== null && cell in counts) {
+                counts[cell]++;
             }
         });
+
         return counts;
     }
-}
 
-// Export for Node.js (CommonJS), ESM, and browser
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = TicTacToe;
-    // Add ESM export for Node.js
-    export { TicTacToe as default };
-} else {
-    window.TicTacToe = TicTacToe;
+    #validateImportedState() {
+        const size = this.#config.boardSize;
+        
+        // Validate board dimensions
+        if (!Array.isArray(this.#board) || this.#board.length !== size) {
+            throw new ConfigurationError('Invalid board dimensions');
+        }
+
+        for (const row of this.#board) {
+            if (!Array.isArray(row) || row.length !== size) {
+                throw new ConfigurationError('Invalid board row dimensions');
+            }
+        }
+
+        // Validate current player
+        if (!this.#config.players.includes(this.#currentPlayer)) {
+            throw new ConfigurationError('Invalid current player');
+        }
+
+        // Validate game status
+        if (!Object.values(TicTacToe.GAME_STATUSES).includes(this.#gameStatus)) {
+            throw new ConfigurationError('Invalid game status');
+        }
+    }
 }
