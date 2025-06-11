@@ -383,9 +383,11 @@ class TicTacToe {
     }
 }
 
-// Export for Node.js or browser
+// Export for Node.js (CommonJS), ESM, and browser
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = TicTacToe;
+    // Add ESM export for Node.js
+    export { TicTacToe as default };
 } else {
     window.TicTacToe = TicTacToe;
 }
