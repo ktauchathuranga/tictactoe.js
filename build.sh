@@ -7,27 +7,39 @@ CONTAINER_NAME="tictactoe"
 IMAGE_NAME="tictactoe-app"
 PORT_MAPPING="8080:80"
 
-# Stop the container if it is running
-if [ "$(docker ps -q -f name=$CONTAINER_NAME)" ]; then
-    echo "Stopping container $CONTAINER_NAME..."
-    docker stop $CONTAINER_NAME
+# Function to stop and remove container and image
+stop_and_clean() {
+    # Stop the container if it is running
+    if [ "$(docker ps -q -f name=$CONTAINER_NAME)" ]; then
+        echo "Stopping container $CONTAINER_NAME..."
+        docker stop $CONTAINER_NAME
+    fi
+
+    # Remove the container if it exists
+    if [ "$(docker ps -a -q -f name=$CONTAINER_NAME)" ]; then
+        echo "Removing container $CONTAINER_NAME..."
+        docker rm $CONTAINER_NAME
+    fi
+
+    # Remove the image if it exists
+    if [ "$(docker images -q $IMAGE_NAME)" ]; then
+        echo "Removing image $IMAGE_NAME..."
+        docker rmi $IMAGE_NAME
+    fi
+
+    # Remove dangling images
+    echo "Cleaning up dangling images..."
+    docker image prune -f
+}
+
+# Check for 'stop' argument
+if [ "$1" = "stop" ]; then
+    stop_and_clean
+    exit 0
 fi
 
-# Remove the container if it exists
-if [ "$(docker ps -a -q -f name=$CONTAINER_NAME)" ]; then
-    echo "Removing container $CONTAINER_NAME..."
-    docker rm $CONTAINER_NAME
-fi
-
-# Remove the image if it exists
-if [ "$(docker images -q $IMAGE_NAME)" ]; then
-    echo "Removing image $IMAGE_NAME..."
-    docker rmi $IMAGE_NAME
-fi
-
-# Remove dangling images
-echo "Cleaning up dangling images..."
-docker image prune -f
+# Normal operation (no arguments)
+stop_and_clean
 
 # Rebuild the Docker image
 echo "Building image $IMAGE_NAME..."
@@ -45,3 +57,4 @@ if [ $? -eq 0 ]; then
 else
     echo "Build failed. Please check the Dockerfile and files in the current directory."
 fi
+

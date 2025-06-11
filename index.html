@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TicTacToe.js - Interactive Game</title>
+    <title>Professional Tic Tac Toe</title>
     <style>
         * {
             margin: 0;
@@ -211,6 +211,16 @@
             100% { transform: scale(1); opacity: 1; }
         }
 
+        .error-message {
+            background: rgba(255, 0, 0, 0.2);
+            color: #ff6b6b;
+            padding: 10px;
+            border-radius: 10px;
+            margin: 10px 0;
+            text-align: center;
+            font-weight: bold;
+        }
+
         @media (max-width: 480px) {
             .container {
                 padding: 20px;
@@ -242,27 +252,32 @@
 </head>
 <body>
     <div class="container">
-        <h1>🎮 TicTacToe.js</h1>
+        <h1>🎮 Tic Tac Toe</h1>
         
         <div class="game-info">
-            <div class="status" id="status">Game Ready</div>
-            <div class="current-player" id="currentPlayer">Player: X</div>
+            <div class="status" id="status">Game in progress</div>
+            <div class="current-player" id="currentPlayer">Current: X</div>
         </div>
 
         <div id="winnerAnnouncement" class="winner-announcement" style="display: none;"></div>
+        <div id="errorMessage" class="error-message" style="display: none;"></div>
 
         <div class="board" id="board"></div>
 
         <div class="controls">
-            <button onclick="restartGame()">🔄 New Game</button>
-            <button onclick="undo()" id="undoBtn">↶ Undo</button>
-            <button onclick="redo()" id="redoBtn">↷ Redo</button>
-            <button onclick="toggle()">📋 History</button>
+            <button onclick="resetGame()">🔄 New Game</button>
+            <button onclick="undoMove()" id="undoBtn">↶ Undo</button>
+            <button onclick="redoMove()" id="redoBtn">↷ Redo</button>
+        </div>
+
+        <div class="history">
+            <h3>📜 Move History</h3>
+            <div id="moveHistory"></div>
         </div>
 
         <div class="stats">
             <div class="stat-card">
-                <div class="stat-value" id="movesCount">0</div>
+                <div class="stat-value" id="moveCount">0</div>
                 <div class="stat-label">Moves</div>
             </div>
             <div class="stat-card">
@@ -270,206 +285,254 @@
                 <div class="stat-label">Empty Cells</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value" id="gameStatus">Ongoing</div>
-                <div class="stat-label">Status</div>
+                <div class="stat-value" id="playerX">0</div>
+                <div class="stat-label">Player X</div>
             </div>
-        </div>
-
-        <div class="history" id="history" style="display: none;">
-            <h3>Move History</h3>
-            <div id="historyList"></div>
+            <div class="stat-card">
+                <div class="stat-value" id="playerO">0</div>
+                <div class="stat-label">Player O</div>
+            </div>
         </div>
     </div>
 
-    <script src="TicTacToe.js"></script>
-    <script>
-        // Initialize game
-        const game = new TicTacToe();
-        let historyVisible = false;
+    <script type="module">
+        // Import the TicTacToe class
+        import TicTacToe from './TicTacToe.js';
 
-        /**
-         * Initializes the game board UI
-         */
-        function initializeBoard() {
+        // Global game instance
+        let game;
+
+        // Initialize the game
+        function initGame() {
+            try {
+                game = new TicTacToe();
+                createBoard();
+                updateDisplay();
+            } catch (error) {
+                showError('Failed to initialize game: ' + error.message);
+            }
+        }
+
+        // Create the game board
+        function createBoard() {
             const boardElement = document.getElementById('board');
             boardElement.innerHTML = '';
             
-            for (let row = 0; row < game.config.boardSize; row++) {
-                for (let col = 0; col < game.config.boardSize; col++) {
+            const board = game.board;
+            for (let row = 0; row < board.length; row++) {
+                for (let col = 0; col < board[row].length; col++) {
                     const cell = document.createElement('button');
                     cell.className = 'cell';
-                    cell.id = `cell-${row}-${col}`;
+                    cell.dataset.row = row;
+                    cell.dataset.col = col;
                     cell.onclick = () => makeMove(row, col);
                     boardElement.appendChild(cell);
                 }
             }
-            updateUI();
         }
 
-        /**
-         * Makes a move and updates the UI
-         * @param {number} row - Row index
-         * @param {number} col - Column index
-         */
+        // Make a move
         function makeMove(row, col) {
-            const result = game.move(row, col);
-            if (result.success) {
-                updateUI();
-                if (game.isGameOver()) {
-                    winnerAnnouncement();
+            try {
+                const result = game.move(row, col);
+                
+                if (!result.success) {
+                    showError(result.error);
+                    return;
                 }
-            } else {
-                alert(result.error);
-            }
-        }
 
-        /**
-         * Updates the entire UI based on game state
-         */
-        function updateUI() {
-            const board = game.board();
-            const stats = game.stats();
-            const winningLine = game.getWinningLine();
-            
-            // Update board
-            for (let row = 0; row < game.config.boardSize; row++) {
-                for (let col = 0; col < game.config.boardSize; col++) {
-                    const cell = document.getElementById(`cell-${row}-${col}`);
-                    cell.textContent = board[row][col] || '';
-                    cell.disabled = board[row][col] !== null || game.isGameOver();
-                    
-                    // Highlight winning line
-                    if (winningLine && winningLine.some(pos => pos.row === row && pos.col === col)) {
-                        cell.classList.add('winning');
-                    } else {
-                        cell.classList.remove('winning');
+                hideError();
+                updateDisplay();
+
+                // Handle game end
+                if (result.isGameOver) {
+                    if (result.winner) {
+                        showWinner(result.winner);
+                        highlightWinningLine(result.winningLine);
+                    } else if (game.isDraw) {
+                        showDraw();
                     }
                 }
-            }
-            
-            // Update game info
-            document.getElementById('status').textContent = getStatusText();
-            document.getElementById('currentPlayer').textContent = `Player: ${game.turn()}`;
-            
-            // Update stats
-            document.getElementById('movesCount').textContent = stats.moveCount;
-            document.getElementById('emptyCells').textContent = stats.emptyCells;
-            document.getElementById('gameStatus').textContent = stats.gameStatus.charAt(0).toUpperCase() + stats.gameStatus.slice(1);
-            
-            // Update buttons
-            document.getElementById('undoBtn').disabled = game.history().length === 0;
-            document.getElementById('redoBtn').disabled = game._redoStack.length === 0;
-            
-            // Update history if visible
-            if (historyVisible) {
-                updateHistory();
+            } catch (error) {
+                showError('Unexpected error: ' + error.message);
             }
         }
 
-        /**
-         * Gets the status message
-         * @returns {string} Status text
-         */
-        function getStatusText() {
-            if (game.isDraw()) {
-                return "🤝 It's a Draw!";
-            } else if (game.winner()) {
-                return `🎉 ${game.winner()} Wins!`;
-            } else {
-                return `🎮 ${game.turn()}'s Turn`;
-            }
+        // Update the display
+        function updateDisplay() {
+            updateBoard();
+            updateGameInfo();
+            updateHistory();
+            updateStats();
+            updateControls();
         }
 
-        /**
-         * Shows the winner or draw announcement
-         */
-        function winnerAnnouncement() {
-            const announcement = document.getElementById('winnerAnnouncement');
-            if (game.winner()) {
-                announcement.textContent = `🎉 Congratulations! Player ${game.winner()} Wins! 🎉`;
-                announcement.style.background = 'linear-gradient(45deg, #FF6B6B, #4ECDC4)';
-            } else {
-                announcement.textContent = "🤝 It's a Draw! Well played both! 🤝";
-                announcement.style.background = 'linear-gradient(45deg, #FFA726, #42A5F5)';
-            }
-            announcement.style.display = 'block';
+        // Update the board display
+        function updateBoard() {
+            const board = game.board;
+            const cells = document.querySelectorAll('.cell');
             
-            // Hide after 5 seconds
-            setTimeout(() => {
-                announcement.style.display = 'none';
-            }, 5000);
+            cells.forEach((cell, index) => {
+                const row = Math.floor(index / board.length);
+                const col = index % board.length;
+                const value = board[row][col];
+                
+                cell.textContent = value || '';
+                cell.disabled = value !== null || game.isGameOver;
+                cell.classList.remove('winning');
+            });
         }
 
-        /**
-         * Resets the game and UI
-         */
-        function restartGame() {
-            game.reset();
-            document.getElementById('winnerAnnouncement').style.display = 'none';
-            updateUI();
-        }
-
-        /**
-         * Undoes the last move
-         */
-        function undo() {
-            const result = game.undo();
-            if (result.success) {
-                updateUI();
-                document.getElementById('winnerAnnouncement').style.display = 'none';
-            } else {
-                alert(result.error);
-            }
-        }
-
-        /**
-         * Redoes the last undone move
-         */
-        function redo() {
-            const result = game.redo();
-            if (result.success) {
-                updateUI();
-                if (game.isGameOver()) {
-                    winnerAnnouncement();
+        // Update game info
+        function updateGameInfo() {
+            const statusElement = document.getElementById('status');
+            const currentPlayerElement = document.getElementById('currentPlayer');
+            
+            if (game.isGameOver) {
+                if (game.winner) {
+                    statusElement.textContent = `🎉 Player ${game.winner} wins!`;
+                } else if (game.isDraw) {
+                    statusElement.textContent = '🤝 It\'s a draw!';
                 }
+                currentPlayerElement.style.display = 'none';
             } else {
-                alert(result.error);
+                statusElement.textContent = 'Game in progress';
+                currentPlayerElement.textContent = `Current: ${game.currentPlayer}`;
+                currentPlayerElement.style.display = 'block';
             }
         }
 
-        /**
-         * Toggles the visibility of move history
-         */
-        function toggle() {
-            historyVisible = !historyVisible;
-            const historyElement = document.getElementById('history');
-            historyElement.style.display = historyVisible ? 'block' : 'none';
-            if (historyVisible) {
-                updateHistory();
-            }
-        }
-
-        /**
-         * Updates the move history UI
-         */
+        // Update move history
         function updateHistory() {
-            const historyList = document.getElementById('historyList');
-            const history = game.history();
+            const historyElement = document.getElementById('moveHistory');
+            const history = game.history;
             
-            if (history.length === 0) {
-                historyList.innerHTML = '<div class="move-item">No moves yet</div>';
-                return;
-            }
+            historyElement.innerHTML = '';
             
-            historyList.innerHTML = history.map((move, index) => 
-                `<div class="move-item">
-                    ${index + 1}. ${move.player} → ${move.algebraic}
-                </div>`
-            ).join('');
+            history.forEach((move, index) => {
+                const moveItem = document.createElement('div');
+                moveItem.className = 'move-item';
+                moveItem.textContent = `${index + 1}. ${move.player} → ${move.algebraic}`;
+                historyElement.appendChild(moveItem);
+            });
         }
 
-        // Initialize the game
-        initializeBoard();
+        // Update statistics
+        function updateStats() {
+            const stats = game.stats;
+            
+            document.getElementById('moveCount').textContent = stats.moveCount;
+            document.getElementById('emptyCells').textContent = stats.emptyCells;
+            document.getElementById('playerX').textContent = stats.playerCounts.X || 0;
+            document.getElementById('playerO').textContent = stats.playerCounts.O || 0;
+        }
+
+        // Update control buttons
+        function updateControls() {
+            const stats = game.stats;
+            document.getElementById('undoBtn').disabled = !stats.canUndo;
+            document.getElementById('redoBtn').disabled = !stats.canRedo;
+        }
+
+        // Highlight winning line
+        function highlightWinningLine(winningLine) {
+            if (!winningLine) return;
+            
+            const cells = document.querySelectorAll('.cell');
+            const boardSize = game.config.boardSize;
+            
+            winningLine.forEach(pos => {
+                const index = pos.row * boardSize + pos.col;
+                if (cells[index]) {
+                    cells[index].classList.add('winning');
+                }
+            });
+        }
+
+        // Show winner announcement
+        function showWinner(winner) {
+            const announcement = document.getElementById('winnerAnnouncement');
+            announcement.textContent = `🎉 Player ${winner} wins! 🎉`;
+            announcement.style.display = 'block';
+        }
+
+        // Show draw announcement
+        function showDraw() {
+            const announcement = document.getElementById('winnerAnnouncement');
+            announcement.textContent = '🤝 It\'s a draw! Well played! 🤝';
+            announcement.style.display = 'block';
+        }
+
+        // Show error message
+        function showError(message) {
+            const errorElement = document.getElementById('errorMessage');
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+        }
+
+        // Hide error message
+        function hideError() {
+            const errorElement = document.getElementById('errorMessage');
+            errorElement.style.display = 'none';
+        }
+
+        // Reset game
+        window.resetGame = function() {
+            try {
+                game.reset();
+                document.getElementById('winnerAnnouncement').style.display = 'none';
+                hideError();
+                updateDisplay();
+            } catch (error) {
+                showError('Failed to reset game: ' + error.message);
+            }
+        };
+
+        // Undo move
+        window.undoMove = function() {
+            try {
+                const result = game.undo();
+                if (!result.success) {
+                    showError(result.error);
+                    return;
+                }
+                
+                hideError();
+                document.getElementById('winnerAnnouncement').style.display = 'none';
+                updateDisplay();
+            } catch (error) {
+                showError('Failed to undo move: ' + error.message);
+            }
+        };
+
+        // Redo move
+        window.redoMove = function() {
+            try {
+                const result = game.redo();
+                if (!result.success) {
+                    showError(result.error);
+                    return;
+                }
+                
+                hideError();
+                updateDisplay();
+                
+                // Handle game end after redo
+                if (result.isGameOver) {
+                    if (result.winner) {
+                        showWinner(result.winner);
+                        highlightWinningLine(result.winningLine);
+                    } else if (game.isDraw) {
+                        showDraw();
+                    }
+                }
+            } catch (error) {
+                showError('Failed to redo move: ' + error.message);
+            }
+        };
+
+        // Initialize the game when the page loads
+        initGame();
     </script>
 </body>
 </html>
