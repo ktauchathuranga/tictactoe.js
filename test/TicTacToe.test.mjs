@@ -3,7 +3,7 @@ import TicTacToe, {
   ConfigurationError,
   InvalidMoveError,
   GameStateError,
-} from '../TicTacToe.mjs';
+} from '../TicTacToe.js';
 
 describe('TicTacToe', () => {
   let game;
