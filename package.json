@@ -1,6 +1,6 @@
 {
   "name": "@ktauchathuranga/tictactoe.js",
-  "version": "1.0.4",
+  "version": "1.1.0",
   "description": "A Tic Tac Toe game library for Node.js and browsers.",
   "keywords": [
     "tictactoe"
@@ -16,9 +16,9 @@
   "license": "MIT",
   "author": "Ashen Chathuranga",
   "type": "module",
-  "main": "TicTacToe.js",
+  "main": "TicTacToe.mjs",
   "scripts": {
-    "test": "jest"
+    "test": "node --experimental-vm-modules node_modules/.bin/jest"
   },
   "devDependencies": {
     "jest": "^30.0.0"

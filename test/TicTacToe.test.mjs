@@ -1,4 +1,9 @@
-import TicTacToe, { TicTacToeError, ConfigurationError, InvalidMoveError, GameStateError } from '../TicTacToe.js';
+import TicTacToe, {
+  TicTacToeError,
+  ConfigurationError,
+  InvalidMoveError,
+  GameStateError,
+} from '../TicTacToe.mjs';
 
 describe('TicTacToe', () => {
   let game;
@@ -16,11 +21,11 @@ describe('TicTacToe', () => {
     });
 
     test('should initialize with custom configuration', () => {
-      const customGame = new TicTacToe({ 
-        boardSize: 4, 
-        winLength: 4, 
-        players: ['A', 'B'], 
-        startingPlayer: 'B' 
+      const customGame = new TicTacToe({
+        boardSize: 4,
+        winLength: 4,
+        players: ['A', 'B'],
+        startingPlayer: 'B',
       });
       expect(customGame.board.length).toBe(4);
       expect(customGame.currentPlayer).toBe('B');
@@ -34,7 +39,9 @@ describe('TicTacToe', () => {
 
     test('should throw ConfigurationError for invalid win length', () => {
       expect(() => new TicTacToe({ winLength: 2 })).toThrow(ConfigurationError);
-      expect(() => new TicTacToe({ winLength: 5, boardSize: 3 })).toThrow(ConfigurationError);
+      expect(() => new TicTacToe({ winLength: 5, boardSize: 3 })).toThrow(
+        ConfigurationError,
+      );
     });
   });
 
@@ -81,7 +88,7 @@ describe('TicTacToe', () => {
       game.move(0, 1); // X
       game.move(1, 1); // O
       game.move(0, 2); // X wins
-      
+
       const result = game.move(2, 2);
       expect(result.success).toBe(false);
       expect(result.errorType).toBe('GameStateError');
@@ -95,7 +102,7 @@ describe('TicTacToe', () => {
       game.move(0, 1); // X
       game.move(1, 1); // O
       game.move(0, 2); // X wins
-      
+
       expect(game.winner).toBe('X');
       expect(game.isGameOver).toBe(true);
       expect(game.gameStatus).toBe('finished');
@@ -108,7 +115,7 @@ describe('TicTacToe', () => {
       game.move(1, 0); // X
       game.move(0, 2); // O
       game.move(2, 0); // X wins
-      
+
       expect(game.winner).toBe('X');
       expect(game.isGameOver).toBe(true);
     });
@@ -119,7 +126,7 @@ describe('TicTacToe', () => {
       game.move(1, 1); // X
       game.move(0, 2); // O
       game.move(2, 2); // X wins
-      
+
       expect(game.winner).toBe('X');
       expect(game.isGameOver).toBe(true);
     });
@@ -135,7 +142,7 @@ describe('TicTacToe', () => {
       game.move(1, 2); // X
       game.move(2, 2); // O
       game.move(2, 1); // X
-      
+
       expect(game.isDraw).toBe(true);
       expect(game.gameStatus).toBe('draw');
       expect(game.winner).toBe(null);
@@ -146,7 +153,7 @@ describe('TicTacToe', () => {
     test('should undo move', () => {
       game.move(0, 0);
       expect(game.board[0][0]).toBe('X');
-      
+
       const undoResult = game.undo();
       expect(undoResult.success).toBe(true);
       expect(game.board[0][0]).toBe(null);
@@ -156,7 +163,7 @@ describe('TicTacToe', () => {
     test('should redo move', () => {
       game.move(0, 0);
       game.undo();
-      
+
       const redoResult = game.redo();
       expect(redoResult.success).toBe(true);
       expect(game.board[0][0]).toBe('X');
@@ -189,7 +196,7 @@ describe('TicTacToe', () => {
     test('should validate legal moves', () => {
       expect(game.isLegalMove(0, 0)).toBe(true);
       expect(game.isLegalMove(3, 3)).toBe(false);
-      
+
       game.move(0, 0);
       expect(game.isLegalMove(0, 0)).toBe(false);
     });
@@ -209,9 +216,9 @@ describe('TicTacToe', () => {
     test('should reset game', () => {
       game.move(0, 0);
       game.move(1, 1);
-      
+
       game.reset();
-      
+
       expect(game.board[0][0]).toBe(null);
       expect(game.board[1][1]).toBe(null);
       expect(game.currentPlayer).toBe('X');
@@ -222,15 +229,15 @@ describe('TicTacToe', () => {
     test('should export and import game state', () => {
       game.move(0, 0);
       game.move(1, 1);
-      
+
       const exportedState = game.exportState();
       expect(exportedState).toHaveProperty('board');
       expect(exportedState).toHaveProperty('currentPlayer');
       expect(exportedState).toHaveProperty('moveHistory');
-      
+
       const newGame = new TicTacToe();
       newGame.importState(exportedState);
-      
+
       expect(newGame.board[0][0]).toBe('X');
       expect(newGame.board[1][1]).toBe('O');
       expect(newGame.currentPlayer).toBe('X');
@@ -242,7 +249,7 @@ describe('TicTacToe', () => {
     test('should provide string representation of board', () => {
       game.move(0, 0); // X
       game.move(1, 1); // O
-      
+
       const boardString = game.toString();
       expect(boardString).toContain('a b c');
       expect(boardString).toContain('X');
@@ -278,18 +285,18 @@ describe('TicTacToe', () => {
     });
 
     test('should work with more players', () => {
-      const multiGame = new TicTacToe({ 
-        players: ['X', 'O', 'Z'], 
-        startingPlayer: 'Z' 
+      const multiGame = new TicTacToe({
+        players: ['X', 'O', 'Z'],
+        startingPlayer: 'Z',
       });
       expect(multiGame.currentPlayer).toBe('Z');
-      
+
       multiGame.move(0, 0); // Z
       expect(multiGame.currentPlayer).toBe('X');
-      
+
       multiGame.move(0, 1); // X
       expect(multiGame.currentPlayer).toBe('O');
-      
+
       multiGame.move(0, 2); // O
       expect(multiGame.currentPlayer).toBe('Z');
     });
