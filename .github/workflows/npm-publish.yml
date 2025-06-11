@@ -1,0 +1,72 @@
+name: Auto Publish to NPM
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  check-and-publish:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history to compare versions
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        registry-url: 'https://registry.npmjs.org'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Get current version from package.json
+      id: package-version
+      run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+    
+    - name: Get package name
+      id: package-name
+      run: echo "name=$(node -p "require('./package.json').name")" >> $GITHUB_OUTPUT
+    
+    - name: Check if version exists on NPM
+      id: version-check
+      run: |
+        if npm view ${{ steps.package-name.outputs.name }}@${{ steps.package-version.outputs.version }} version 2>/dev/null; then
+          echo "exists=true" >> $GITHUB_OUTPUT
+          echo "Version ${{ steps.package-version.outputs.version }} already exists on NPM"
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+          echo "Version ${{ steps.package-version.outputs.version }} does not exist on NPM"
+        fi
+    
+    - name: Run tests
+      if: steps.version-check.outputs.exists == 'false'
+      run: npm test
+    
+    - name: Build package
+      if: steps.version-check.outputs.exists == 'false'
+      run: npm run build
+      continue-on-error: true  # Continue if build script doesn't exist
+    
+    - name: Publish to NPM
+      if: steps.version-check.outputs.exists == 'false'
+      run: npm publish
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    
+    - name: Create Git tag
+      if: steps.version-check.outputs.exists == 'false'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git tag v${{ steps.package-version.outputs.version }}
+        git push origin v${{ steps.package-version.outputs.version }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Skip publishing
+      if: steps.version-check.outputs.exists == 'true'
+      run: echo "Skipping publish - version ${{ steps.package-version.outputs.version }} already exists on NPM"
